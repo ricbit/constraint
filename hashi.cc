@@ -4,6 +4,7 @@
 #include <cctype>
 #include <set>
 #include <cstdio>
+#include <limits>
 
 using namespace std;
 
@@ -165,12 +166,17 @@ class ConstraintSolver {
   }
 
   int choose() {
-    for (auto var : variables) {
+    int chosen = 0;
+    int diff = numeric_limits<int>::max();
+    for (const auto& var : variables) {
       if (var.lmin != var.lmax) {
-        return var.id;
+        if (var.lmax - var.lmin < diff) {
+          chosen = var.id;
+          diff = var.lmax - var.lmin;
+        }
       }
     }
-    return -1;
+    return chosen;
   }
 
   bool finished() {
