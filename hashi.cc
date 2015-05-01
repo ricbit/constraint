@@ -34,10 +34,7 @@ struct Constraint {
 
 class ExternalConstraint {
  public:
-  virtual bool operator()(const vector<Variable>& variables) const {
-    cout << "dummy constraint\n";
-    return true;
-  };
+  virtual bool operator()(const vector<Variable>& variables) const = 0;
 };
 
 class NoCrossConstraint : public ExternalConstraint {
@@ -64,7 +61,7 @@ class ConstraintSolver {
   int recursion_nodes;
   vector<Variable> variables, solution;
   vector<Constraint> constraints;
-  vector<ExternalConstraint*> external;
+  vector<const ExternalConstraint*> external;
  public:
   ConstraintSolver() : recursion_nodes(0) {}
 
@@ -77,11 +74,11 @@ class ConstraintSolver {
     return variables.size() - 1;
   }
 
-  void add_external_constraint(ExternalConstraint* cons) {
+  void add_external_constraint(const ExternalConstraint* cons) {
     external.push_back(cons);
   }
 
-  Variable value(int id) {
+  const Variable& value(int id) {
     return solution[id];
   }
 
@@ -98,15 +95,6 @@ class ConstraintSolver {
   }
 
   void solve() {
-    cout << "variable " << variables.size() << "\n";
-    for (auto cons : constraints) {
-      cout << "constraint ";
-      for (auto var : cons.variables) {
-        cout << var << " (" << variables[var].lmin 
-             << "," << variables[var].lmax << ") ";
-      }
-      cout << "\n";
-    }
     tight();
     recursion();
     cout << "Recursion nodes: " << recursion_nodes << "\n";
@@ -115,17 +103,13 @@ class ConstraintSolver {
   bool recursion() {
     recursion_nodes++;
     if (finished()) {      
-      cout << "found\n";
       solution = variables;
       return true;
     }
     int index = choose();
     vector<Variable> bkp(variables.begin(), variables.end());
     auto var = variables[index];
-    cout << "recursion on node " << var.id << " lmin " << var.lmin
-         << " lmax " << var.lmax << "\n";
     for (int i = var.lmin; i <= var.lmax; i++) {
-      cout << "recursion on node " << var.id << " to " << i << "\n";
       copy(bkp.begin(), bkp.end(), variables.begin());
       auto& var = variables[index];
       var.lmin = var.lmax = i;
@@ -136,7 +120,6 @@ class ConstraintSolver {
           return true;
         }
       }
-      cout << "next\n";
     }
     copy(bkp.begin(), bkp.end(), variables.begin());
     return false;
@@ -150,13 +133,10 @@ class ConstraintSolver {
         cmin += var.lmin;
         cmax += var.lmax;
       }
-      //cout << "constraint cmin " << cmin << " "  << cons.lmin 
-      //     << " cmax " << cmax << " " << cons.lmax << "\n";
       if (cmax < cons.lmin || cmin > cons.lmax) {
         return false;
       }
     }
-    cout << "external constraints " << external.size() << "\n";
     for (auto& cons : external) {
       if (!(*cons)(variables)) {
         return false;
@@ -259,7 +239,6 @@ class HashiSolver {
         }
       }
     }
-    cout << "number of nodes: " << nodes.size() << "\n";
 
     for (int j = 0; j < height; j++) {
       for (int i = 0; i < width; i++) {
@@ -289,7 +268,6 @@ class HashiSolver {
         } 
       }
     } 
-    cout << "number of links " << links.size() << "\n";
 
     for (auto& l1 : links) {
       if (l1.horizontal) {
@@ -308,16 +286,6 @@ class HashiSolver {
       nodes[link.a].links.insert(link.id);
       nodes[link.b].links.insert(link.id);
     }
-
-    for (auto link : links) {
-        cout << "link from " << nodes[link.a].size 
-             << " to " << nodes[link.b].size << " (";
-        for (auto x : link.forbidden) {
-          cout << nodes[links[x].a].size << "-" 
-               << nodes[links[x].b].size << " " ;
-        }
-        cout << ")\n";
-    }
   }
 
   void solve() {
@@ -325,17 +293,16 @@ class HashiSolver {
     for (auto& link : links) {
       link.id = solver.create_variable(0, 2);
     }
-    for (auto n : nodes) {
+    for (const auto& n : nodes) {
       auto cons = solver.create_constraint(n.size, n.size);
       for (auto link : n.links) {
-        cout << "trying to add " << cons << " " << links[link].id << "\n";
         solver.add_variable(cons, links[link].id);
       }
     }
     NoCrossConstraint no_cross(links);
     solver.add_external_constraint(&no_cross);
     solver.solve();
-    for (auto link : links) {
+    for (const auto& link : links) {
       auto var = solver.value(link.id);
       cout << "solution from node " << nodes[link.a].size
            << " to " << nodes[link.b].size << " is " 
