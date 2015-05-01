@@ -144,10 +144,10 @@ class ConstraintSolver {
       return true;
     }
     int index = choose();
-    vector<Variable> bkp(variables.begin(), variables.end());
+    vector<Variable> bkp = variables;
     auto var = variables[index];
     for (int i = var.lmin; i <= var.lmax; i++) {
-      copy(bkp.begin(), bkp.end(), variables.begin());
+      variables = bkp;
       auto& var = variables[index];
       var.lmin = var.lmax = i;
       if (tight() && valid()) {
@@ -156,7 +156,7 @@ class ConstraintSolver {
         }
       }
     }
-    copy(bkp.begin(), bkp.end(), variables.begin());
+    variables = bkp;
     return false;
   }
 
@@ -282,7 +282,7 @@ class HashiSolver {
     for_all_digits([&](int j, int i) {
       for (int ii = i + 1; ii < width; ii++) {
         if (isdigit(grid[j][ii])) {
-         links.push_back(Link(id[j][i], id[j][ii], true, links.size()));
+          links.push_back(Link(id[j][i], id[j][ii], true, links.size()));
           break;
         }
       }
