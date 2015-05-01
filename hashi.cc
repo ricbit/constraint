@@ -10,6 +10,7 @@ using namespace std;
 struct Node {
   int x, y;
   int size;
+  int id;
   set<int> links;
 };
 
@@ -122,7 +123,7 @@ class ConstraintSolver {
       copy(bkp.begin(), bkp.end(), variables.begin());
       auto& var = variables[index];
       var.lmin = var.lmax = i;
-      //tight();
+      tight();
       if (valid()) {
         cout << "is valid\n";
         if (recursion()) {
@@ -241,6 +242,7 @@ class HashiSolver {
           n.x = i;
           n.y = j;
           n.size = grid[j][i] - '0';
+          n.id = current;
           id[j][i] = current++;
           nodes.push_back(n);
         }
@@ -257,6 +259,7 @@ class HashiSolver {
               link.a = id[j][i];
               link.b = id[j][ii];
               link.horizontal = true;
+              link.id = links.size();
               links.push_back(link);
               break;
             }
@@ -267,6 +270,7 @@ class HashiSolver {
               link.a = id[j][i];
               link.b = id[jj][i];
               link.horizontal = false;
+              link.id = links.size();
               links.push_back(link);
               break;
             }
@@ -279,21 +283,19 @@ class HashiSolver {
     for (auto& l1 : links) {
       if (l1.horizontal) {
         int y = nodes[l1.a].y;
-        for (int i = 0; i < int(links.size()); i++) {
-          auto& l2 = links[i];
+        for (const auto& l2 : links) {
           int x = nodes[l2.a].x;
           if (y > nodes[l2.a].y && y < nodes[l2.b].y &&
               x > nodes[l1.a].x && x < nodes[l1.b].x) {
-            l1.forbidden.insert(i);
+            l1.forbidden.insert(l2.id);
           }
         }        
       }
     }
 
-    for (int i = 0; i < int(links.size()); i++) {
-      auto& link = links[i];
-      nodes[link.a].links.insert(i);
-      nodes[link.b].links.insert(i);
+    for (const auto& link : links) {
+      nodes[link.a].links.insert(link.id);
+      nodes[link.b].links.insert(link.id);
     }
 
     for (auto link : links) {
@@ -339,12 +341,12 @@ class HashiSolver {
       fprintf(f, "n%d_%d [ label=%d\npos=\"%d,%d!\"]\n",
               i, n.size, n.size, n.x, n.y);
     }
-    for (int i = 0; i < int(links.size()); i++) {
-      if (solver.value(i).lmin > 0) {
+    for (const auto& link : links) {
+      if (solver.value(link.id).lmin > 0) {
         fprintf(f, "n%d_%d -- n%d_%d [style=%s];\n", 
-                links[i].a, nodes[links[i].a].size,
-                links[i].b, nodes[links[i].b].size,
-                solver.value(i).lmin == 1 ? "dashed" : "solid");
+                link.a, nodes[link.a].size,
+                link.b, nodes[link.b].size,
+                solver.value(link.id).lmin == 1 ? "dashed" : "solid");
       }
     }
     fprintf(f, "}\n");
