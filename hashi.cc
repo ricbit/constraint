@@ -128,7 +128,7 @@ class ConstraintSolver {
       copy(bkp.begin(), bkp.end(), variables.begin());
       auto& var = variables[index];
       var.lmin = var.lmax = i;
-      tight();
+      //tight();
       if (valid()) {
         cout << "is valid\n";
         if (recursion()) {
@@ -343,7 +343,7 @@ class HashiSolver {
     for (int i = 0; i < int(nodes.size()); i++) {
       auto n = nodes[i];
       fprintf(f, "n%d_%d [ label=%d\npos=\"%d,%d!\"]\n",
-              i, n.size, n.size, n.x, n.y);
+              i, n.size, n.size, n.x, height - n.y - 1);
     }
     for (const auto& link : links) {
       for (int i = 1; i <= solver.value(link.id).lmin; i++) {
