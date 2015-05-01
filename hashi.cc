@@ -48,9 +48,9 @@ class NoCrossConstraint : public ExternalConstraint {
 
   virtual bool operator()(const vector<Variable>& variables) const {
     cout << "no cross constraint checked\n";
-    for (int i = 0; i < int(links.size()); i++) {
-      for (int other : links[i].forbidden) {
-        if (variables[links[i].a].lmin > 0 &&
+    for (const auto& link : links) {
+      for (int other : link.forbidden) {
+        if (variables[link.id].lmin > 0 &&
             variables[other].lmin > 0) {
           return false;
         }
@@ -64,7 +64,7 @@ class ConstraintSolver {
   int recursion_nodes;
   vector<Variable> variables, solution;
   vector<Constraint> constraints;
-  vector<ExternalConstraint> external;
+  vector<ExternalConstraint*> external;
  public:
   ConstraintSolver() : recursion_nodes(0) {}
 
@@ -77,7 +77,7 @@ class ConstraintSolver {
     return variables.size() - 1;
   }
 
-  void add_external_constraint(ExternalConstraint cons) {
+  void add_external_constraint(ExternalConstraint* cons) {
     external.push_back(cons);
   }
 
@@ -129,7 +129,7 @@ class ConstraintSolver {
       copy(bkp.begin(), bkp.end(), variables.begin());
       auto& var = variables[index];
       var.lmin = var.lmax = i;
-      //tight();
+      tight();
       if (valid()) {
         cout << "is valid\n";
         if (recursion()) {
@@ -158,7 +158,7 @@ class ConstraintSolver {
     }
     cout << "external constraints " << external.size() << "\n";
     for (auto& cons : external) {
-      if (!cons(variables)) {
+      if (!(*cons)(variables)) {
         return false;
       }
     }
@@ -333,7 +333,7 @@ class HashiSolver {
       }
     }
     NoCrossConstraint no_cross(links);
-    solver.add_external_constraint(no_cross);
+    solver.add_external_constraint(&no_cross);
     solver.solve();
     for (auto link : links) {
       auto var = solver.value(link.id);
