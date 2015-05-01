@@ -57,7 +57,7 @@ class SingleGroupConstraint : public ExternalConstraint {
     while (!next.empty()) {
       int cur = next.front();
       next.pop();
-      for (const auto& ilink : nodes[cur].links) {
+      for (int ilink : nodes[cur].links) {
         const auto& link = links[ilink];
         int other = link.a == cur ? link.b : link.a;
         if (!visited[other] && variables[ilink].lmax > 0) {
@@ -298,10 +298,12 @@ class HashiSolver {
       if (l1.horizontal) {
         int y = nodes[l1.a].y;
         for (const auto& l2 : links) {
-          int x = nodes[l2.a].x;
-          if (y > nodes[l2.a].y && y < nodes[l2.b].y &&
-              x > nodes[l1.a].x && x < nodes[l1.b].x) {
-            l1.forbidden.insert(l2.id);
+          if (!l2.horizontal) {
+            int x = nodes[l2.a].x;
+            if (y > nodes[l2.a].y && y < nodes[l2.b].y &&
+                x > nodes[l1.a].x && x < nodes[l1.b].x) {
+              l1.forbidden.insert(l2.id);
+            }
           }
         }        
       }
