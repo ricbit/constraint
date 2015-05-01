@@ -342,11 +342,10 @@ class HashiSolver {
               i, n.size, n.size, n.x, n.y);
     }
     for (const auto& link : links) {
-      if (solver.value(link.id).lmin > 0) {
-        fprintf(f, "n%d_%d -- n%d_%d [style=%s];\n", 
+      for (int i = 1; i <= solver.value(link.id).lmin; i++) {
+        fprintf(f, "n%d_%d -- n%d_%d;\n", 
                 link.a, nodes[link.a].size,
-                link.b, nodes[link.b].size,
-                solver.value(link.id).lmin == 1 ? "dashed" : "solid");
+                link.b, nodes[link.b].size);
       }
     }
     fprintf(f, "}\n");
