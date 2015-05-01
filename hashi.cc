@@ -60,10 +60,13 @@ class NoCrossConstraint : public ExternalConstraint {
 };
 
 class ConstraintSolver {
+  int recursion_nodes;
   vector<Variable> variables, solution;
   vector<Constraint> constraints;
   vector<ExternalConstraint> external;
  public:
+  ConstraintSolver() : recursion_nodes(0) {}
+
   int create_variable(int lmin, int lmax) {
     Variable v;
     v.lmin = lmin;
@@ -105,9 +108,11 @@ class ConstraintSolver {
     }
     tight();
     recursion();
+    cout << "Recursion nodes: " << recursion_nodes << "\n";
   }
 
   bool recursion() {
+    recursion_nodes++;
     if (finished()) {      
       cout << "found\n";
       solution = variables;
@@ -324,7 +329,6 @@ class HashiSolver {
     NoCrossConstraint no_cross(links);
     solver.add_external_constraint(no_cross);
     solver.solve();
-
     for (auto link : links) {
       auto var = solver.value(link.id);
       cout << "solution from node " << nodes[link.a].size
