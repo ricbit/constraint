@@ -5,6 +5,7 @@
 #include <set>
 #include <cstdio>
 #include <limits>
+#include <queue>
 
 using namespace std;
 
@@ -13,13 +14,17 @@ struct Node {
   int size;
   int id;
   set<int> links;
+  Node(int x_, int y_, int size_, int id_)
+      : x(x_), y(y_), size(size_), id(id_) {}
 };
 
 struct Link {
   int a, b;
   bool horizontal;
-  set<int> forbidden;
   int id;
+  set<int> forbidden;
+  Link(int a_, int b_, bool horizontal_, int id_)
+      : a(a_), b(b_), horizontal(horizontal_), id(id_) {}
 };
 
 struct Variable {
@@ -35,6 +40,42 @@ struct Constraint {
 class ExternalConstraint {
  public:
   virtual bool operator()(const vector<Variable>& variables) const = 0;
+};
+
+class SingleGroupConstraint : public ExternalConstraint {
+  const vector<Node>& nodes;
+  const vector<Link>& links;
+ public:
+  SingleGroupConstraint(const vector<Node>& nodes_, const vector<Link>& links_)
+      : nodes(nodes_), links(links_) {}
+
+  virtual bool operator()(const vector<Variable>& variables) const {
+    cout << "single start\n";
+    vector<bool> visited(nodes.size(), false);
+    queue<int> next;
+    next.push(0);
+    visited[0] = true;
+    while (!next.empty()) {
+      int cur = next.front();
+      cout << cur << " ";
+      next.pop();
+      for (const auto& ilink : nodes[cur].links) {
+        const auto& link = links[ilink];
+        int other = link.a == cur ? link.b : link.a;
+        if (!visited[other] && variables[ilink].lmax > 0) {
+          visited[other] = true;
+          next.push(other);
+        }
+      }
+    }
+    cout << "\n";
+    for (bool v : visited) {
+      if (!v) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 
 class NoCrossConstraint : public ExternalConstraint {
@@ -228,52 +269,39 @@ class HashiSolver {
       : width(width_), height(height_), grid(grid_) {
   }
 
-  void degeometrize() {
-    vector<vector<int>> id(height, vector<int>(width, -1));
-
-    int current = 0;
+  template<typename T>
+  void for_all_digits(T callback) {
     for (int j = 0; j < height; j++) {
       for (int i = 0; i < width; i++) {
         if (isdigit(grid[j][i])) {
-          Node n;
-          n.x = i;
-          n.y = j;
-          n.size = grid[j][i] - '0';
-          n.id = current;
-          id[j][i] = current++;
-          nodes.push_back(n);
+          callback(j, i);
         }
       }
     }
+  }
 
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width; i++) {
-        if (isdigit(grid[j][i])) {
-          for (int ii = i + 1; ii < width; ii++) {
-            if (isdigit(grid[j][ii])) {
-              Link link;
-              link.a = id[j][i];
-              link.b = id[j][ii];
-              link.horizontal = true;
-              link.id = links.size();
-              links.push_back(link);
-              break;
-            }
-          }
-          for (int jj = j + 1; jj < height; jj++) {
-            if (isdigit(grid[jj][i])) {
-              Link link;
-              link.a = id[j][i];
-              link.b = id[jj][i];
-              link.horizontal = false;
-              link.id = links.size();
-              links.push_back(link);
-              break;
-            }
-          }
-        } 
+  void degeometrize() {
+    vector<vector<int>> id(height, vector<int>(width, -1));
+
+    for_all_digits([&](int j, int i) {
+      id[j][i] = nodes.size();
+      nodes.push_back(Node(i, j, grid[j][i] - '0', nodes.size()));
+    });
+
+    for_all_digits([&](int j, int i) {
+      for (int ii = i + 1; ii < width; ii++) {
+        if (isdigit(grid[j][ii])) {
+         links.push_back(Link(id[j][i], id[j][ii], true, links.size()));
+          break;
+        }
       }
-    } 
+      for (int jj = j + 1; jj < height; jj++) {
+        if (isdigit(grid[jj][i])) {
+          links.push_back(Link(id[j][i], id[jj][i], false, links.size()));
+          break;
+        }
+      }
+    });
 
     for (auto& l1 : links) {
       if (l1.horizontal) {
@@ -307,6 +335,8 @@ class HashiSolver {
     }
     NoCrossConstraint no_cross(links);
     solver.add_external_constraint(&no_cross);
+    SingleGroupConstraint single_group(nodes, links);
+    solver.add_external_constraint(&single_group);
     solver.solve();
     for (const auto& link : links) {
       auto var = solver.value(link.id);
@@ -319,10 +349,9 @@ class HashiSolver {
   void print() {
     FILE *f = fopen("hashi.dot", "wt");
     fprintf(f, "graph {\n");
-    for (int i = 0; i < int(nodes.size()); i++) {
-      auto n = nodes[i];
-      fprintf(f, "n%d_%d [ label=%d\npos=\"%d,%d!\"]\n",
-              i, n.size, n.size, n.x, height - n.y - 1);
+    for (const auto& n : nodes) {
+      fprintf(f, "n%d_%d [label=%d\npos=\"%d,%d!\"]\n",
+              n.id, n.size, n.size, n.x, height - n.y - 1);
     }
     for (const auto& link : links) {
       for (int i = 1; i <= solver.value(link.id).lmin; i++) {
