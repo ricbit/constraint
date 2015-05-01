@@ -323,6 +323,16 @@ class HashiSolver {
         solver.add_variable(cons, links[link].id);
       }
     }
+    if (nodes.size() > 2) {
+      for (const auto& link : links) {
+        if (nodes[link.a].size == nodes[link.b].size &&
+            nodes[link.a].size <= 2) {
+          int size = nodes[link.a].size;
+          auto cons = solver.create_constraint(0, size - 1);
+          solver.add_variable(cons, link.id);
+        }
+      }
+    }
     NoCrossConstraint no_cross(links);
     solver.add_external_constraint(&no_cross);
     SingleGroupConstraint single_group(nodes, links);
