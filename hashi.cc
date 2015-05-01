@@ -50,14 +50,12 @@ class SingleGroupConstraint : public ExternalConstraint {
       : nodes(nodes_), links(links_) {}
 
   virtual bool operator()(const vector<Variable>& variables) const {
-    cout << "single start\n";
     vector<bool> visited(nodes.size(), false);
     queue<int> next;
     next.push(0);
     visited[0] = true;
     while (!next.empty()) {
       int cur = next.front();
-      cout << cur << " ";
       next.pop();
       for (const auto& ilink : nodes[cur].links) {
         const auto& link = links[ilink];
@@ -68,7 +66,6 @@ class SingleGroupConstraint : public ExternalConstraint {
         }
       }
     }
-    cout << "\n";
     for (bool v : visited) {
       if (!v) {
         return false;
@@ -85,7 +82,6 @@ class NoCrossConstraint : public ExternalConstraint {
       : links(links_) {}
 
   virtual bool operator()(const vector<Variable>& variables) const {
-    cout << "no cross constraint checked\n";
     for (const auto& link : links) {
       for (int other : link.forbidden) {
         if (variables[link.id].lmin > 0 &&
@@ -155,7 +151,6 @@ class ConstraintSolver {
       auto& var = variables[index];
       var.lmin = var.lmax = i;
       if (tight() && valid()) {
-        cout << "is valid\n";
         if (recursion()) {
           return true;
         }
@@ -227,8 +222,6 @@ class ConstraintSolver {
             return false;
           }
           if (var.lmin < limit) {
-            cout << "changed var " << ivar << " from " << var.lmin 
-                 << " to " << limit << "\n";
             var.lmin = limit;
             changed = true;
           }
@@ -244,8 +237,6 @@ class ConstraintSolver {
             return false;
           }
           if (var.lmax > limit) {
-            cout << "changed var " << ivar << " from " << var.lmax
-                 << " to " << limit << "\n";
             var.lmax = limit;
             changed = true;
           }
@@ -323,7 +314,6 @@ class HashiSolver {
   }
 
   void solve() {
-    cout << "start solver\n";
     for (auto& link : links) {
       link.id = solver.create_variable(0, 2);
     }
