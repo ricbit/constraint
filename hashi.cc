@@ -113,8 +113,7 @@ class ConstraintSolver {
       copy(bkp.begin(), bkp.end(), variables.begin());
       auto& var = variables[index];
       var.lmin = var.lmax = i;
-      tight();
-      if (valid()) {
+      if (tight() && valid()) {
         cout << "is valid\n";
         if (recursion()) {
           return true;
@@ -168,7 +167,7 @@ class ConstraintSolver {
     return true;
   }
 
-  void tight() {
+  bool tight() {
     bool changed = true;
     while (changed) {
       changed = false;
@@ -182,6 +181,9 @@ class ConstraintSolver {
             if (ivar != iother) {
               limit -= other.lmax;
             }
+          }
+          if (limit > var.lmax) {
+            return false;
           }
           if (var.lmin < limit) {
             cout << "changed var " << ivar << " from " << var.lmin 
@@ -197,6 +199,9 @@ class ConstraintSolver {
               limit -= other.lmin;
             }
           }
+          if (limit < var.lmin) {
+            return false;
+          }
           if (var.lmax > limit) {
             cout << "changed var " << ivar << " from " << var.lmax
                  << " to " << limit << "\n";
@@ -206,6 +211,7 @@ class ConstraintSolver {
         }
       }
     }
+    return true;
   }
 };
 
