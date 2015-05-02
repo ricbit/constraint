@@ -7,65 +7,43 @@
 
 using namespace std;
 
+struct Node {
+  int y, x;
+  int id;
+  vector<int> links;
+  Node(int y_, int x_, int id_) : y(y_), x(x_), id(id_) {}
+};
+
+struct Link {
+  int a, b;
+  int id;
+  Link(int a_, int b_, int id_) : a(a_), b(b_), id(id_) {}
+};
+
+struct Cell {
+  int size;
+  vector<int> links;
+};
+
 class PointConstraint : public ExternalConstraint {
-  int y, x, width, height;
-  const vector<vector<int>>& vert;
-  const vector<vector<int>>& horiz;
+  const vector<int>& links;
  public:
-  PointConstraint(int y_, int x_, int width_, int height_,
-    const vector<vector<int>>& vert_, const vector<vector<int>>& horiz_) 
-      : y(y_), x(x_), width(width_), height(height_), 
-        vert(vert_), horiz(horiz_) {}
+  PointConstraint(const vector<int>& links_) : links(links_) {}
+  virtual ~PointConstraint() {}
 
   virtual bool operator()(const vector<Variable>& variables) const {
-    int minsum = 0;
-    int detsum = 0;
-    int detvalue = 0;
-    int alllinks = 0;
-    if (x < width) {
-      minsum += variables[horiz[y][x]].lmin;
-      alllinks++;
-      if (variables[horiz[y][x]].lmin == variables[horiz[y][x]].lmax) {
-        detsum++;
-        detvalue += variables[horiz[y][x]].lmin;
+    int fixed = 0;
+    int fixedsum = 0;
+    for (int link : links) {
+      if (variables[link].lmin == variables[link].lmax) {
+        fixed++;
+        fixedsum += variables[link].lmin;
       }
     }
-    if (x > 0) {
-      minsum += variables[horiz[y][x - 1]].lmin;
-      alllinks++;
-      if (variables[horiz[y][x - 1]].lmin == variables[horiz[y][x - 1]].lmax) {
-        detsum++;
-        detvalue += variables[horiz[y][x - 1]].lmin;
-      }
-    }
-    if (y < height) {
-      minsum += variables[vert[y][x]].lmin;
-      alllinks++;
-      if (variables[vert[y][x]].lmin == variables[vert[y][x]].lmax) {
-        detsum++;
-        detvalue += variables[vert[y][x]].lmin;
-      }
-    }
-    if (y > 0) {
-      minsum += variables[vert[y - 1][x]].lmin;
-      alllinks++;
-      if (variables[vert[y - 1][x]].lmin == variables[vert[y - 1][x]].lmax) {
-        detsum++;
-        detvalue += variables[vert[y - 1][x]].lmin;
-      }
-    }
-    if (minsum > 2) {
-      cout << "failed " << y << " " << x << " minsum " << minsum << "\n";
-      return false;
-    }
-    if (alllinks != detsum) {
+    if (fixed < int(links.size())) {
       return true;
     }
-    if (detvalue == 0 || detvalue == 2) {
-      return true;
-    }
-    cout << "failed " << y << " " << x << " detvalue " << detvalue << "\n";
-    return false;
+    return fixedsum == 0 || fixedsum == 2;
   }
 };
 
@@ -73,57 +51,96 @@ class SlitherLinkSolver {
   int width, height;
   const vector<string>& grid;
   ConstraintSolver solver;
-  vector<vector<int>> vert, horiz;
+  vector<Node> nodes;
+  vector<Link> links;
+  vector<Cell> cells;
  public:
   SlitherLinkSolver(int width_, int height_, const vector<string>& grid_)
       : width(width_), height(height_), grid(grid_) {}
 
-  void solve() {
-    vert.resize(height);
-    for (int j = 0; j < height; j++) {
+  int getid(int j, int i) {
+    return j * (width + 1) + i;
+  }
+
+  void degeometrize() {
+    for (int j = 0; j < height + 1; j++) {
       for (int i = 0; i < width + 1; i++) {
-        vert[j].push_back(solver.create_variable(0, 1));
+        nodes.push_back(Node(j, i, nodes.size()));
       }
     }
-    horiz.resize(height + 1);
+    vector<vector<vector<int>>> cellpos(height, vector<vector<int>>(width));
     for (int j = 0; j < height + 1; j++) {
       for (int i = 0; i < width; i++) {
-        horiz[j].push_back(solver.create_variable(0, 1));
+        int id = links.size();
+        links.push_back(Link(getid(j, i), getid(j, i + 1), id));
+        nodes[getid(j, i)].links.push_back(id);
+        nodes[getid(j, i + 1)].links.push_back(id);
+        if (j > 0) {
+          cellpos[j - 1][i].push_back(id);
+        }
+        if (j < height) {
+          cellpos[j][i].push_back(id);
+        }
+      }
+    }
+    for (int j = 0; j < height; j++) {
+      for (int i = 0; i < width + 1; i++) {
+        int id = links.size();
+        links.push_back(Link(getid(j, i), getid(j + 1, i), id));
+        nodes[getid(j, i)].links.push_back(id);
+        nodes[getid(j + 1, i)].links.push_back(id);
+        if (i > 0) {
+          cellpos[j][i - 1].push_back(id);
+        }
+        if (i < width) {
+          cellpos[j][i].push_back(id);
+        }
       }
     }
     for (int j = 0; j < height; j++) {
       for (int i = 0; i < width; i++) {
         if (isdigit(grid[j][i])) {
-          int size = grid[j][i] - '0';
-          auto cons = solver.create_constraint(size, size);
-          solver.add_variable(cons, horiz[j][i]);
-          solver.add_variable(cons, horiz[j + 1][i]);
-          solver.add_variable(cons, vert[j][i]);
-          solver.add_variable(cons, vert[j][i + 1]);
+          Cell cell;
+          cell.size = grid[j][i] - '0';
+          cell.links = cellpos[j][i];
+          cells.push_back(cell);
         }
       }
     }
-    vector<PointConstraint*> external;
-    for (int j = 0; j < height + 1; j++) {
-      for (int i = 0; i < width + 1; i++) {
-        PointConstraint *pc = new PointConstraint(
-            j, i, width, height, vert, horiz);
-        external.push_back(pc);
-        solver.add_external_constraint(pc);
+    for (const Cell& cell : cells) {
+      cout << "cell ";
+      for (int link : cell.links) {
+        cout << link << " ";
       }
+      cout << "\n";
+    }
+  }
+
+  void solve() {
+    for (Link& link: links) {
+      link.id = solver.create_variable(0, 1);
+    }
+    for (const Cell& cell : cells) {
+      auto cons = solver.create_constraint(cell.size, cell.size);
+      for (int link : cell.links) {
+        solver.add_variable(cons, link);
+      }
+    }
+    for (const Node& node : nodes) {
+      auto cons = solver.create_constraint(0, 2);
+      for (int link : node.links) {
+        solver.add_variable(cons, link);
+      }
+    }
+    vector<PointConstraint*> external;
+    for (const Node& node : nodes) {
+      PointConstraint *pc = new PointConstraint(node.links);
+      external.push_back(pc);
+      solver.add_external_constraint(pc);
     }
     solver.solve();
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width + 1; i++) {
-        cout << "vert " << j << " " << i << " " 
-             << solver.value(vert[j][i]).lmin << "\n";
-      }
-    }
-    for (int j = 0; j < height + 1; j++) {
-      for (int i = 0; i < width; i++) {
-        cout << "horiz " << j << " " << i << " "
-             << solver.value(horiz[j][i]).lmin << "\n";
-      }
+    for (auto cons : external) {
+      delete cons;
     }
   }
 
@@ -144,21 +161,14 @@ class SlitherLinkSolver {
         }
       }
     }
-    for (int j = 0; j < height; j++) {
-      for (int i = 0; i < width + 1; i++) {
-        if (solver.value(vert[j][i]).lmin > 0) {
-          fprintf(f, "n%d_%d -- n%d_%d;\n", j, i, j + 1, i); 
-        }
+    for (const Link& link : links) {
+      if (solver.value(link.id).lmin > 0) {
+        fprintf(f, "n%d_%d -- n%d_%d;\n", 
+                nodes[link.a].y, nodes[link.a].x,
+                nodes[link.b].y, nodes[link.b].x);
       }
     }
-    for (int j = 0; j < height + 1; j++) {
-      for (int i = 0; i < width; i++) {
-        if (solver.value(horiz[j][i]).lmin > 0) {
-          fprintf(f, "n%d_%d -- n%d_%d;\n", j, i, j, i + 1); 
-        }
-      }
-    }
-    
+   
     fprintf(f, "}\n");
     fclose(f);
   }
@@ -172,6 +182,7 @@ int main() {
     cin >> grid[i];
   }
   SlitherLinkSolver s(width, height, grid);  
+  s.degeometrize();
   s.solve();
   s.print();
   return 0;
