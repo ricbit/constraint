@@ -1,6 +1,6 @@
 all : hashi.png
 
-hashi : hashi.cc Makefile
+hashi : hashi.cc Makefile constraint.h
 	g++ -std=c++14 hashi.cc -o hashi -O3 -Wall -g
 
 hashi.dot : hashi hashi.txt

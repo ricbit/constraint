@@ -8,13 +8,16 @@
 #include <queue>
 
 struct Variable {
+  bool fixed;
   int lmin, lmax;
   int id;
+  std::vector<int> constraints;
+  Variable() : fixed(false) {}
 };
 
 struct Constraint {
   int lmin, lmax;
-  std::set<int> variables;
+  std::vector<int> variables;
 };
 
 class ExternalConstraint {
@@ -30,10 +33,17 @@ class ConstraintSolver {
  public:
   ConstraintSolver() : recursion_nodes(0) {}
 
+  void change_var(int var_id, int lmin, int lmax) {
+    variables[var_id].lmin = lmin;
+    variables[var_id].lmax = lmax;
+    variables[var_id].fixed = lmin == lmax;
+  }
+
   int create_variable(int lmin, int lmax) {
     Variable v;
     v.lmin = lmin;
     v.lmax = lmax;
+    v.fixed = lmin == lmax;
     v.id = variables.size();
     variables.push_back(v);
     return variables.size() - 1;
@@ -56,11 +66,21 @@ class ConstraintSolver {
   }
 
   void add_variable(int constraint_id, int variable_id) {
-    constraints[constraint_id].variables.insert(variable_id);
+    constraints[constraint_id].variables.push_back(variable_id);
+    variables[variable_id].constraints.push_back(constraint_id);
   }
 
   void solve() {
+    std::cout << "Variables: " << variables.size() << "\n";
+    std::cout << "Constraints: " << constraints.size() << "\n";
     tight();
+    int freevars = 0;
+    for (const auto& var : variables) {
+      if (!var.fixed) {
+        freevars++;
+      }
+    }
+    std::cout << "Free variables: " << freevars << "\n";
     recursion();
     std::cout << "Recursion nodes: " << recursion_nodes << "\n";
   }
@@ -76,8 +96,7 @@ class ConstraintSolver {
     auto var = variables[index];
     for (int i = var.lmin; i <= var.lmax; i++) {
       variables = bkp;
-      auto& var = variables[index];
-      var.lmin = var.lmax = i;
+      change_var(index, i, i);
       if (tight() && valid()) {
         if (recursion()) {
           return true;
@@ -112,7 +131,7 @@ class ConstraintSolver {
     int chosen = 0;
     int diff = std::numeric_limits<int>::max();
     for (const auto& var : variables) {
-      if (var.lmin != var.lmax) {
+      if (!var.fixed) {
         if (var.lmax - var.lmin < diff) {
           chosen = var.id;
           diff = var.lmax - var.lmin;
@@ -124,7 +143,7 @@ class ConstraintSolver {
 
   bool finished() {
     for (auto var : variables) {
-      if (var.lmin != var.lmax) {
+      if (!var.fixed) {
         return false;
       }
     }
@@ -150,7 +169,7 @@ class ConstraintSolver {
             return false;
           }
           if (var.lmin < limit) {
-            var.lmin = limit;
+            change_var(ivar, limit, var.lmax);
             changed = true;
           }
           // decrease max
@@ -165,7 +184,7 @@ class ConstraintSolver {
             return false;
           }
           if (var.lmax > limit) {
-            var.lmax = limit;
+            change_var(ivar, var.lmin, limit);
             changed = true;
           }
         }
