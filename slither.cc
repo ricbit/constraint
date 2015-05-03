@@ -217,7 +217,7 @@ class SlitherLinkSolver {
       }
     }
     for (const Link& link : links) {
-      if (solver.value(link.id).lmin > 0) {
+      if (solver.value(link.id) > 0) {
         fprintf(f, "n%d_%d -- n%d_%d;\n", 
                 nodes[link.a].y, nodes[link.a].x,
                 nodes[link.b].y, nodes[link.b].x);

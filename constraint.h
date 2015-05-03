@@ -17,47 +17,61 @@ struct Bounds {
   int lmin, lmax;
 };
 
+struct Metadata {
+  int id;
+  std::vector<int> constraints;
+};
+
 struct Constraint {
   int lmin, lmax;
   std::vector<int> variables;
 };
 
 class State {
-  std::vector<Variable> variables, solution;
+  std::vector<Bounds> bounds, solution;
+  std::vector<Metadata> metadata;
  public:
-  State(std::vector<Variable>& variables_) : variables(variables_) {}
+  State(const std::vector<Variable>& variables) 
+      : bounds(variables.size()), metadata(variables.size()) {
+    for (const Variable& var : variables) {
+      bounds[var.id].lmin = var.lmin;
+      bounds[var.id].lmax = var.lmax;
+      metadata[var.id].id = var.id;
+      metadata[var.id].constraints = var.constraints;
+    }
+  }
 
   void save_solution() {
-    solution = variables;
+    solution = bounds;
   }
 
   int read_lmax(int id) const {
-    return variables[id].lmax;
+    return bounds[id].lmax;
   }
 
   int read_lmin(int id) const {
-    return variables[id].lmin;
+    return bounds[id].lmin;
   }
 
   bool fixed(int id) const {
-    return variables[id].lmin == variables[id].lmax;
+    return bounds[id].lmin == bounds[id].lmax;
   }
 
-  const Variable& value(int id) const {
-    return solution[id];
+  int value(int id) const {
+    return solution[id].lmin;
   }
 
   void change_var(int var_id, int lmin, int lmax) {
-    variables[var_id].lmin = lmin;
-    variables[var_id].lmax = lmax;
+    bounds[var_id].lmin = lmin;
+    bounds[var_id].lmax = lmax;
   }
 
-  const std::vector<Variable>& get_variables() {
-    return variables;
+  const std::vector<Bounds>& get_variables() {
+    return bounds;
   }
 
-  void set_variables(const std::vector<Variable>& new_vars) {
-    variables = new_vars;
+  void set_variables(const std::vector<Bounds>& new_vars) {
+    bounds = new_vars;
   }
 };
 
@@ -107,7 +121,7 @@ class ConstraintSolver {
     external.push_back(cons);
   }
 
-  const Variable& value(int id) {
+  int value(int id) {
     return state->value(id);
   }
 
@@ -147,7 +161,7 @@ class ConstraintSolver {
       return true;
     }
     int index = choose();
-    std::vector<Variable> bkp = state->get_variables();
+    std::vector<Bounds> bkp = state->get_variables();
     int savemin = read_lmin(index), savemax = read_lmax(index);
     for (int i = savemin; i <= savemax; i++) {
       state->set_variables(bkp);
