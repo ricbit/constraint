@@ -34,15 +34,15 @@ class SingleLineConstraint : public ExternalConstraint {
       : nodes(nodes_), links(links_) {}
   virtual ~SingleLineConstraint() {}
 
-  virtual bool operator()(const vector<Variable>& variables) const {
-    for (const auto& var : variables) {
-      if (!var.fixed) {
+  virtual bool operator()(const State* state) const {    
+    for (const auto& link : links) {
+      if (!state->fixed(link.id)) {
         return true;
       }
     }
     int start = -1;
     for (const auto& link : links) {
-      if (variables[link.id].lmin > 0) {
+      if (state->read_lmin(link.id) > 0) {
         start = link.id;
         break;
       }
@@ -56,13 +56,13 @@ class SingleLineConstraint : public ExternalConstraint {
       cout << cur << " ";
       next.pop();
       for (const auto& link : nodes[links[cur].a].links) {
-        if (!visited[link] && variables[link].lmin > 0) {
+        if (!visited[link] && state->read_lmin(link) > 0) {
           visited[link] = true;
           next.push(link);
         }
       }
       for (const auto& link : nodes[links[cur].b].links) {
-        if (!visited[link] && variables[link].lmin > 0) {
+        if (!visited[link] && state->read_lmin(link) > 0) {
           visited[link] = true;
           next.push(link);
         }
@@ -70,7 +70,7 @@ class SingleLineConstraint : public ExternalConstraint {
     }
     cout << "\n";
     for (const auto& link : links) {
-      if (variables[link.id].lmin > 0 && !visited[link.id]) {
+      if (state->read_lmin(link.id) > 0 && !visited[link.id]) {
         return false;
       }
     }
@@ -84,13 +84,13 @@ class PointConstraint : public ExternalConstraint {
   PointConstraint(const vector<int>& links_) : links(links_) {}
   virtual ~PointConstraint() {}
 
-  virtual bool operator()(const vector<Variable>& variables) const {
+  virtual bool operator()(const State* state) const {
     int fixed = 0;
     int fixedsum = 0;
     for (int link : links) {
-      if (variables[link].lmin == variables[link].lmax) {
+      if (state->fixed(link)) {
         fixed++;
-        fixedsum += variables[link].lmin;
+        fixedsum += state->read_lmin(link);
       }
     }
     if (fixed < int(links.size())) {
