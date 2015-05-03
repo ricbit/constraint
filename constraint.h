@@ -24,6 +24,7 @@ struct Metadata {
 
 struct Constraint {
   int lmin, lmax;
+  int id;
   std::vector<int> variables;
 };
 
@@ -129,6 +130,7 @@ class ConstraintSolver {
     Constraint cons;
     cons.lmin = lmin;
     cons.lmax = lmax;
+    cons.id = constraints.size();
     constraints.push_back(cons);
     return constraints.size() - 1;
   }
@@ -148,6 +150,15 @@ class ConstraintSolver {
       if (!fixed(var.id)) {
         freevars++;
       }
+      std::cout << "var " << var.id << " : lmin " << read_lmin(var.id)
+                << " lmax " << read_lmax(var.id) << "\n";
+    }
+    for (const Constraint& cons : constraints) {
+      std::cout << "cons " << cons.id << " : ";
+      for (int var : cons.variables) {
+        std::cout << var << " ";
+      }
+      std::cout << "\n";
     }
     std::cout << "Free variables: " << freevars << "\n";
     recursion();
