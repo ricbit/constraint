@@ -177,7 +177,7 @@ class HashiSolver {
       auto var = solver.value(link.id);
       cout << "solution from node " << nodes[link.a].size
            << " to " << nodes[link.b].size << " is " 
-           << "(" << var.lmin << " , " << var.lmax << ")\n";
+           << "(" << var << ")\n";
     }
   }
 
@@ -189,7 +189,7 @@ class HashiSolver {
               n.id, n.size, n.size, n.x, height - n.y - 1);
     }
     for (const auto& link : links) {
-      for (int i = 1; i <= solver.value(link.id).lmin; i++) {
+      for (int i = 1; i <= solver.value(link.id); i++) {
         fprintf(f, "n%d_%d -- n%d_%d;\n", 
                 link.a, nodes[link.a].size,
                 link.b, nodes[link.b].size);
