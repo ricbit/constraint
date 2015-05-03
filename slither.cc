@@ -25,6 +25,59 @@ struct Cell {
   vector<int> links;
 };
 
+class SingleLineConstraint : public ExternalConstraint {
+  const vector<Node>& nodes;
+  const vector<Link>& links;
+ public:
+  SingleLineConstraint(
+      const vector<Node>& nodes_, const vector<Link>& links_)
+      : nodes(nodes_), links(links_) {}
+  virtual ~SingleLineConstraint() {}
+
+  virtual bool operator()(const vector<Variable>& variables) const {
+    for (const auto& var : variables) {
+      if (!var.fixed) {
+        return true;
+      }
+    }
+    int start = -1;
+    for (const auto& link : links) {
+      if (variables[link.id].lmin > 0) {
+        start = link.id;
+        break;
+      }
+    }
+    vector<bool> visited(links.size(), false);
+    visited[start] = true;
+    queue<int> next;
+    next.push(start);
+    while (!next.empty()) {
+      int cur = next.front();
+      cout << cur << " ";
+      next.pop();
+      for (const auto& link : nodes[links[cur].a].links) {
+        if (!visited[link] && variables[link].lmin > 0) {
+          visited[link] = true;
+          next.push(link);
+        }
+      }
+      for (const auto& link : nodes[links[cur].b].links) {
+        if (!visited[link] && variables[link].lmin > 0) {
+          visited[link] = true;
+          next.push(link);
+        }
+      }
+    }
+    cout << "\n";
+    for (const auto& link : links) {
+      if (variables[link.id].lmin > 0 && !visited[link.id]) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
 class PointConstraint : public ExternalConstraint {
   const vector<int>& links;
  public:
@@ -138,6 +191,8 @@ class SlitherLinkSolver {
       external.push_back(pc);
       solver.add_external_constraint(pc);
     }
+    SingleLineConstraint single_line(nodes, links);
+    solver.add_external_constraint(&single_line);
     solver.solve();
     for (auto cons : external) {
       delete cons;

@@ -135,6 +135,9 @@ class ConstraintSolver {
         if (var.lmax - var.lmin < diff) {
           chosen = var.id;
           diff = var.lmax - var.lmin;
+        } else if (var.lmax - var.lmin == diff && 
+            var.constraints.size() > variables[chosen].constraints.size()) {
+          chosen = var.id;
         }
       }
     }
