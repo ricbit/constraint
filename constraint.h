@@ -8,11 +8,13 @@
 #include <queue>
 
 struct Variable {
-  bool fixed;
   int lmin, lmax;
   int id;
   std::vector<int> constraints;
-  Variable() : fixed(false) {}
+};
+
+struct Bounds {
+  int lmin, lmax;
 };
 
 struct Constraint {
@@ -38,7 +40,7 @@ class State {
   }
 
   bool fixed(int id) const {
-    return variables[id].fixed;
+    return variables[id].lmin == variables[id].lmax;
   }
 
   const Variable& value(int id) const {
@@ -48,7 +50,6 @@ class State {
   void change_var(int var_id, int lmin, int lmax) {
     variables[var_id].lmin = lmin;
     variables[var_id].lmax = lmax;
-    variables[var_id].fixed = lmin == lmax;
   }
 
   const std::vector<Variable>& get_variables() {
@@ -97,7 +98,6 @@ class ConstraintSolver {
     Variable v;
     v.lmin = lmin;
     v.lmax = lmax;
-    v.fixed = lmin == lmax;
     v.id = variables.size();
     variables.push_back(v);
     return variables.size() - 1;
