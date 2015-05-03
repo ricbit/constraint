@@ -163,10 +163,9 @@ class ConstraintSolver {
   }
 
   bool valid() {
-    for (auto cons : constraints) {
+    for (const Constraint& cons : constraints) {
       int cmin = 0, cmax = 0;
-      for (auto i : cons.variables) {
-        auto var = variables[i];
+      for (int i : cons.variables) {
         cmin += read_lmin(i);
         cmax += read_lmax(i);
       }
@@ -185,7 +184,7 @@ class ConstraintSolver {
   int choose() {
     int chosen = 0;
     int diff = std::numeric_limits<int>::max();
-    for (const auto& var : variables) {
+    for (const Variable& var : variables) {
       if (!fixed(var.id)) {
         int cur_diff = read_lmax(var.id) - read_lmin(var.id);
         if (cur_diff < diff) {
@@ -201,7 +200,7 @@ class ConstraintSolver {
   }
 
   bool finished() {
-    for (auto var : variables) {
+    for (const Variable& var : variables) {
       if (!fixed(var.id)) {
         return false;
       }
@@ -213,12 +212,12 @@ class ConstraintSolver {
     bool changed = true;
     while (changed) {
       changed = false;
-      for (auto cons : constraints) {
-        for (auto ivar : cons.variables) {
+      for (const Constraint& cons : constraints) {
+        for (int ivar : cons.variables) {
           auto& var = variables[ivar];
           // increase min
           int limit = cons.lmin;
-          for (auto iother : cons.variables) {
+          for (int iother : cons.variables) {
             auto& other = variables[iother];
             if (ivar != iother) {
               limit -= read_lmax(iother);
