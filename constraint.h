@@ -33,6 +33,10 @@ class ConstraintSolver {
  public:
   ConstraintSolver() : recursion_nodes(0) {}
 
+  int read_lmax(int id) {
+    return variables[id].lmax;
+  }
+
   int read_lmin(int id) {
     return variables[id].lmin;
   }
@@ -101,8 +105,8 @@ class ConstraintSolver {
     }
     int index = choose();
     std::vector<Variable> bkp = variables;
-    auto var = variables[index];
-    for (int i = read_lmin(index); i <= var.lmax; i++) {
+    int savemin = read_lmin(index), savemax = read_lmax(index);
+    for (int i = savemin; i <= savemax; i++) {
       variables = bkp;
       change_var(index, i, i);
       if (tight() && valid()) {
@@ -121,7 +125,7 @@ class ConstraintSolver {
       for (auto i : cons.variables) {
         auto var = variables[i];
         cmin += read_lmin(i);
-        cmax += var.lmax;
+        cmax += read_lmax(i);
       }
       if (cmax < cons.lmin || cmin > cons.lmax) {
         return false;
@@ -140,7 +144,7 @@ class ConstraintSolver {
     int diff = std::numeric_limits<int>::max();
     for (const auto& var : variables) {
       if (!fixed(var.id)) {
-        int cur_diff = var.lmax - read_lmin(var.id);
+        int cur_diff = read_lmax(var.id) - read_lmin(var.id);
         if (cur_diff < diff) {
           chosen = var.id;
           diff = cur_diff;
@@ -174,14 +178,14 @@ class ConstraintSolver {
           for (auto iother : cons.variables) {
             auto& other = variables[iother];
             if (ivar != iother) {
-              limit -= other.lmax;
+              limit -= read_lmax(iother);
             }
           }
-          if (limit > var.lmax) {
+          if (limit > read_lmax(ivar)) {
             return false;
           }
           if (read_lmin(ivar) < limit) {
-            change_var(ivar, limit, var.lmax);
+            change_var(ivar, limit, read_lmax(ivar));
             changed = true;
           }
           // decrease max
@@ -195,7 +199,7 @@ class ConstraintSolver {
           if (limit < read_lmin(ivar)) {
             return false;
           }
-          if (var.lmax > limit) {
+          if (read_lmax(ivar) > limit) {
             change_var(ivar, read_lmin(ivar), limit);
             changed = true;
           }
