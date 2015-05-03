@@ -33,6 +33,14 @@ class ConstraintSolver {
  public:
   ConstraintSolver() : recursion_nodes(0) {}
 
+  int read_lmin(int id) {
+    return variables[id].lmin;
+  }
+
+  bool fixed(int id) {
+    return variables[id].fixed;
+  }
+
   void change_var(int var_id, int lmin, int lmax) {
     variables[var_id].lmin = lmin;
     variables[var_id].lmax = lmax;
@@ -76,7 +84,7 @@ class ConstraintSolver {
     tight();
     int freevars = 0;
     for (const auto& var : variables) {
-      if (!var.fixed) {
+      if (!fixed(var.id)) {
         freevars++;
       }
     }
@@ -94,7 +102,7 @@ class ConstraintSolver {
     int index = choose();
     std::vector<Variable> bkp = variables;
     auto var = variables[index];
-    for (int i = var.lmin; i <= var.lmax; i++) {
+    for (int i = read_lmin(index); i <= var.lmax; i++) {
       variables = bkp;
       change_var(index, i, i);
       if (tight() && valid()) {
@@ -112,7 +120,7 @@ class ConstraintSolver {
       int cmin = 0, cmax = 0;
       for (auto i : cons.variables) {
         auto var = variables[i];
-        cmin += var.lmin;
+        cmin += read_lmin(i);
         cmax += var.lmax;
       }
       if (cmax < cons.lmin || cmin > cons.lmax) {
@@ -131,11 +139,12 @@ class ConstraintSolver {
     int chosen = 0;
     int diff = std::numeric_limits<int>::max();
     for (const auto& var : variables) {
-      if (!var.fixed) {
-        if (var.lmax - var.lmin < diff) {
+      if (!fixed(var.id)) {
+        int cur_diff = var.lmax - read_lmin(var.id);
+        if (cur_diff < diff) {
           chosen = var.id;
-          diff = var.lmax - var.lmin;
-        } else if (var.lmax - var.lmin == diff && 
+          diff = cur_diff;
+        } else if (cur_diff == diff && 
             var.constraints.size() > variables[chosen].constraints.size()) {
           chosen = var.id;
         }
@@ -146,7 +155,7 @@ class ConstraintSolver {
 
   bool finished() {
     for (auto var : variables) {
-      if (!var.fixed) {
+      if (!fixed(var.id)) {
         return false;
       }
     }
@@ -171,7 +180,7 @@ class ConstraintSolver {
           if (limit > var.lmax) {
             return false;
           }
-          if (var.lmin < limit) {
+          if (read_lmin(ivar) < limit) {
             change_var(ivar, limit, var.lmax);
             changed = true;
           }
@@ -180,14 +189,14 @@ class ConstraintSolver {
           for (auto iother : cons.variables) {
             auto& other = variables[iother];
             if (ivar != iother) {
-              limit -= other.lmin;
+              limit -= read_lmin(iother);
             }
           }
-          if (limit < var.lmin) {
+          if (limit < read_lmin(ivar)) {
             return false;
           }
           if (var.lmax > limit) {
-            change_var(ivar, var.lmin, limit);
+            change_var(ivar, read_lmin(ivar), limit);
             changed = true;
           }
         }
