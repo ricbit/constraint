@@ -35,7 +35,7 @@ class SingleGroupConstraint : public ExternalConstraint {
   SingleGroupConstraint(const vector<Node>& nodes_, const vector<Link>& links_)
       : nodes(nodes_), links(links_) {}
 
-  virtual bool operator()(const vector<Variable>& variables) const {
+  virtual bool operator()(const State* state) const {
     vector<bool> visited(nodes.size(), false);
     queue<int> next;
     next.push(0);
@@ -46,7 +46,7 @@ class SingleGroupConstraint : public ExternalConstraint {
       for (int ilink : nodes[cur].links) {
         const auto& link = links[ilink];
         int other = link.a == cur ? link.b : link.a;
-        if (!visited[other] && variables[ilink].lmax > 0) {
+        if (!visited[other] && state->read_lmax(ilink) > 0) {
           visited[other] = true;
           next.push(other);
         }
@@ -67,11 +67,11 @@ class NoCrossConstraint : public ExternalConstraint {
   NoCrossConstraint(const vector<Link>& links_) 
       : links(links_) {}
 
-  virtual bool operator()(const vector<Variable>& variables) const {
+  virtual bool operator()(const State* state) const {
     for (const auto& link : links) {
       for (int other : link.forbidden) {
-        if (variables[link.id].lmin > 0 &&
-            variables[other].lmin > 0) {
+        if (state->read_lmin(link.id) > 0 &&
+            state->read_lmin(other) > 0) {
           return false;
         }
       }

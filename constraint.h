@@ -20,35 +20,77 @@ struct Constraint {
   std::vector<int> variables;
 };
 
-class ExternalConstraint {
- public:
-  virtual bool operator()(const std::vector<Variable>& variables) const = 0;
-};
-
-class ConstraintSolver {
-  int recursion_nodes;
+class State {
   std::vector<Variable> variables, solution;
-  std::vector<Constraint> constraints;
-  std::vector<const ExternalConstraint*> external;
  public:
-  ConstraintSolver() : recursion_nodes(0) {}
+  State(std::vector<Variable>& variables_) : variables(variables_) {}
 
-  int read_lmax(int id) {
+  void save_solution() {
+    solution = variables;
+  }
+
+  int read_lmax(int id) const {
     return variables[id].lmax;
   }
 
-  int read_lmin(int id) {
+  int read_lmin(int id) const {
     return variables[id].lmin;
   }
 
-  bool fixed(int id) {
+  bool fixed(int id) const {
     return variables[id].fixed;
+  }
+
+  const Variable& value(int id) const {
+    return solution[id];
   }
 
   void change_var(int var_id, int lmin, int lmax) {
     variables[var_id].lmin = lmin;
     variables[var_id].lmax = lmax;
     variables[var_id].fixed = lmin == lmax;
+  }
+
+  const std::vector<Variable>& get_variables() {
+    return variables;
+  }
+
+  void set_variables(const std::vector<Variable>& new_vars) {
+    variables = new_vars;
+  }
+};
+
+class ExternalConstraint {
+ public:
+  virtual bool operator()(const State* state) const = 0;
+};
+
+class ConstraintSolver {
+  int recursion_nodes;
+  State* state;
+  std::vector<Variable> variables;
+  std::vector<Constraint> constraints;
+  std::vector<const ExternalConstraint*> external;
+ public:
+  ConstraintSolver() : recursion_nodes(0), state(nullptr) {}
+  ~ConstraintSolver() { 
+    delete state;
+  }
+
+  int read_lmax(int id) {
+    return state->read_lmax(id);
+  }
+
+  int read_lmin(int id) {
+    return state->read_lmin(id);
+  }
+
+  bool fixed(int id) {
+    return state->fixed(id);
+  }
+
+  void change_var(int var_id, int lmin, int lmax) {
+    state->change_var(var_id, lmin, lmax);
   }
 
   int create_variable(int lmin, int lmax) {
@@ -66,7 +108,7 @@ class ConstraintSolver {
   }
 
   const Variable& value(int id) {
-    return solution[id];
+    return state->value(id);
   }
 
   int create_constraint(int lmin, int lmax) {
@@ -83,6 +125,7 @@ class ConstraintSolver {
   }
 
   void solve() {
+    state = new State(variables);
     std::cout << "Variables: " << variables.size() << "\n";
     std::cout << "Constraints: " << constraints.size() << "\n";
     tight();
@@ -100,14 +143,14 @@ class ConstraintSolver {
   bool recursion() {
     recursion_nodes++;
     if (finished()) {      
-      solution = variables;
+      state->save_solution();
       return true;
     }
     int index = choose();
-    std::vector<Variable> bkp = variables;
+    std::vector<Variable> bkp = state->get_variables();
     int savemin = read_lmin(index), savemax = read_lmax(index);
     for (int i = savemin; i <= savemax; i++) {
-      variables = bkp;
+      state->set_variables(bkp);
       change_var(index, i, i);
       if (tight() && valid()) {
         if (recursion()) {
@@ -115,7 +158,7 @@ class ConstraintSolver {
         }
       }
     }
-    variables = bkp;
+    state->set_variables(bkp);
     return false;
   }
 
@@ -132,7 +175,7 @@ class ConstraintSolver {
       }
     }
     for (auto& cons : external) {
-      if (!(*cons)(variables)) {
+      if (!(*cons)(state)) {
         return false;
       }
     }
