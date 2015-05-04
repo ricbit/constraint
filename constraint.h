@@ -252,6 +252,7 @@ class ConstraintSolver {
           if (read_lmin(ivar) < limit) {
             change_var(ivar, limit, read_lmax(ivar));
             changed = true;
+            break;
           }
           // decrease max
           limit = cons.lmax - allmin + read_lmin(ivar);
@@ -261,6 +262,7 @@ class ConstraintSolver {
           if (read_lmax(ivar) > limit) {
             change_var(ivar, read_lmin(ivar), limit);
             changed = true;
+            break;
           }
         }
       }
