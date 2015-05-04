@@ -238,16 +238,14 @@ class ConstraintSolver {
     while (changed) {
       changed = false;
       for (const Constraint& cons : constraints) {
+        int allmax = 0, allmin = 0;
         for (int ivar : cons.variables) {
-          auto& var = variables[ivar];
+          allmax += read_lmax(ivar);
+          allmin += read_lmin(ivar);
+        }
+        for (int ivar : cons.variables) {
           // increase min
-          int limit = cons.lmin;
-          for (int iother : cons.variables) {
-            auto& other = variables[iother];
-            if (ivar != iother) {
-              limit -= read_lmax(iother);
-            }
-          }
+          int limit = cons.lmin - allmax + read_lmax(ivar);
           if (limit > read_lmax(ivar)) {
             return false;
           }
@@ -256,13 +254,7 @@ class ConstraintSolver {
             changed = true;
           }
           // decrease max
-          limit = cons.lmax;
-          for (auto iother : cons.variables) {
-            auto& other = variables[iother];
-            if (ivar != iother) {
-              limit -= read_lmin(iother);
-            }
-          }
+          limit = cons.lmax - allmin + read_lmin(ivar);
           if (limit < read_lmin(ivar)) {
             return false;
           }
