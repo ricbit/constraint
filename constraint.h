@@ -197,16 +197,6 @@ class ConstraintSolver {
   }
 
   bool valid() {
-    for (const Constraint& cons : constraints) {
-      int cmin = 0, cmax = 0;
-      for (int i : cons.variables) {
-        cmin += read_lmin(i);
-        cmax += read_lmax(i);
-      }
-      if (cmax < cons.lmin || cmin > cons.lmax) {
-        return false;
-      }
-    }
     for (auto& cons : external) {
       if (!(*cons)(state)) {
         return false;
@@ -270,6 +260,10 @@ class ConstraintSolver {
     for (int ivar : cons.variables) {
       allmax += read_lmax(ivar);
       allmin += read_lmin(ivar);
+    }
+    if (allmax < cons.lmin || allmin > cons.lmax) {
+      valid = false;
+      return false;
     }
     for (int ivar : cons.variables) {
       // increase min
