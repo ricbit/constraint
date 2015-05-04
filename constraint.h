@@ -82,13 +82,14 @@ class ExternalConstraint {
 };
 
 class ConstraintSolver {
-  int recursion_nodes;
+  int recursion_nodes, constraints_checked;
   State* state;
   std::vector<Variable> variables;
   std::vector<Constraint> constraints;
   std::vector<const ExternalConstraint*> external;
  public:
-  ConstraintSolver() : recursion_nodes(0), state(nullptr) {}
+  ConstraintSolver() 
+      : recursion_nodes(0), constraints_checked(0), state(nullptr) {}
   ~ConstraintSolver() { 
     delete state;
   }
@@ -163,6 +164,7 @@ class ConstraintSolver {
     std::cout << "Free variables: " << freevars << "\n";
     recursion();
     std::cout << "Recursion nodes: " << recursion_nodes << "\n";
+    std::cout << "Constraints checked: " << constraints_checked << "\n";
   }
 
   bool recursion() {
@@ -234,40 +236,46 @@ class ConstraintSolver {
   }
 
   bool tight() {
-    bool changed = true;
+    bool changed = true, valid = true;
     while (changed) {
       changed = false;
       for (const Constraint& cons : constraints) {
-        int allmax = 0, allmin = 0;
-        for (int ivar : cons.variables) {
-          allmax += read_lmax(ivar);
-          allmin += read_lmin(ivar);
-        }
-        for (int ivar : cons.variables) {
-          // increase min
-          int limit = cons.lmin - allmax + read_lmax(ivar);
-          if (limit > read_lmax(ivar)) {
-            return false;
-          }
-          if (read_lmin(ivar) < limit) {
-            change_var(ivar, limit, read_lmax(ivar));
-            changed = true;
-            break;
-          }
-          // decrease max
-          limit = cons.lmax - allmin + read_lmin(ivar);
-          if (limit < read_lmin(ivar)) {
-            return false;
-          }
-          if (read_lmax(ivar) > limit) {
-            change_var(ivar, read_lmin(ivar), limit);
-            changed = true;
-            break;
-          }
-        }
+        changed |= update_constraint(cons, valid);
       }
     }
     return true;
+  }
+
+  bool update_constraint(const Constraint& cons, bool& valid) {
+    constraints_checked++;
+    int allmax = 0, allmin = 0;
+    for (int ivar : cons.variables) {
+      allmax += read_lmax(ivar);
+      allmin += read_lmin(ivar);
+    }
+    for (int ivar : cons.variables) {
+      // increase min
+      int limit = cons.lmin - allmax + read_lmax(ivar);
+      if (limit > read_lmax(ivar)) {
+        valid = false;
+        return false;
+      }
+      if (read_lmin(ivar) < limit) {
+        change_var(ivar, limit, read_lmax(ivar));
+        return true;
+      }
+      // decrease max
+      limit = cons.lmax - allmin + read_lmin(ivar);
+      if (limit < read_lmin(ivar)) {
+        valid = false;
+        return false;
+      }
+      if (read_lmax(ivar) > limit) {
+        change_var(ivar, read_lmin(ivar), limit);
+        return true;
+      }
+    }
+    return false;
   }
 };
 
