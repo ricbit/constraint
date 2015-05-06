@@ -88,6 +88,7 @@ class ConstraintSolver {
   std::vector<Constraint> constraints;
   std::vector<const ExternalConstraint*> external;
   std::queue<int> active_constraints;
+  std::vector<bool> queued_constraints;
  public:
   ConstraintSolver() 
       : recursion_nodes(0), constraints_checked(0), state(nullptr) {}
@@ -146,6 +147,7 @@ class ConstraintSolver {
     state = new State(variables);
     std::cout << "Variables: " << variables.size() << "\n";
     std::cout << "Constraints: " << constraints.size() << "\n";
+    queued_constraints.resize(constraints.size(), true);
     for (const Constraint& cons : constraints) {
       active_constraints.push(cons.id);
     }
@@ -184,7 +186,10 @@ class ConstraintSolver {
       state->set_variables(bkp);
       change_var(index, i, i);
       for (int cons : variables[index].constraints) {
-        active_constraints.push(cons);
+        if (!queued_constraints[cons]) {
+          active_constraints.push(cons);
+          queued_constraints[cons] = true;
+        }
       }
       if (tight() && valid()) {
         if (recursion()) {
@@ -237,16 +242,22 @@ class ConstraintSolver {
     while (!active_constraints.empty()) {
       int id = active_constraints.front();
       active_constraints.pop();
+      queued_constraints[id] = false;
       if (update_constraint(constraints[id], valid)) {
         for (int var : constraints[id].variables) {
           for (int cons : variables[var].constraints) {
-            active_constraints.push(cons);
+            if (!queued_constraints[cons]) {
+              active_constraints.push(cons);
+              queued_constraints[cons] = true;
+            }
           }
         }
       }
       if (!valid) {
         while (!active_constraints.empty()) {
+          int id = active_constraints.front();
           active_constraints.pop();
+          queued_constraints[id] = false;
         }
         return false;
       }
