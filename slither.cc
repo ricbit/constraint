@@ -35,11 +35,11 @@ class SingleLineConstraint : public ExternalConstraint {
   virtual ~SingleLineConstraint() {}
 
   virtual bool operator()(const State* state) const {    
-    for (const auto& link : links) {
+    /*for (const auto& link : links) {
       if (!state->fixed(link.id)) {
         return true;
       }
-    }
+    }*/
     int start = -1;
     for (const auto& link : links) {
       if (state->read_lmin(link.id) > 0) {
@@ -53,7 +53,7 @@ class SingleLineConstraint : public ExternalConstraint {
     next.push(start);
     while (!next.empty()) {
       int cur = next.front();
-      cout << cur << " ";
+      //cout << cur << " ";
       next.pop();
       for (const auto& link : nodes[links[cur].a].links) {
         if (!visited[link] && state->read_lmax(link) > 0) {
@@ -68,7 +68,7 @@ class SingleLineConstraint : public ExternalConstraint {
         }
       }
     }
-    cout << "\n";
+    //cout << "\n";
     for (const auto& link : links) {
       if (state->read_lmin(link.id) > 0 && !visited[link.id]) {
         return false;
@@ -160,13 +160,13 @@ class SlitherLinkSolver {
         }
       }
     }
-    for (const Cell& cell : cells) {
+    /*for (const Cell& cell : cells) {
       cout << "cell ";
       for (int link : cell.links) {
         cout << link << " ";
       }
       cout << "\n";
-    }
+    }*/
   }
 
   void solve() {
