@@ -56,13 +56,13 @@ class SingleLineConstraint : public ExternalConstraint {
       cout << cur << " ";
       next.pop();
       for (const auto& link : nodes[links[cur].a].links) {
-        if (!visited[link] && state->read_lmin(link) > 0) {
+        if (!visited[link] && state->read_lmax(link) > 0) {
           visited[link] = true;
           next.push(link);
         }
       }
       for (const auto& link : nodes[links[cur].b].links) {
-        if (!visited[link] && state->read_lmin(link) > 0) {
+        if (!visited[link] && state->read_lmax(link) > 0) {
           visited[link] = true;
           next.push(link);
         }
