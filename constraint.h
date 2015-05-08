@@ -7,9 +7,18 @@
 #include <limits>
 #include <queue>
 
+struct VariableId {
+  int id;
+  VariableId() : id(-1) {}
+  VariableId(int id_) : id(id_) {}
+  operator int() const {
+    return id;
+  }
+};
+
 struct Variable {
   int lmin, lmax;
-  int id;
+  VariableId id;
   std::vector<int> constraints;
 };
 
@@ -18,14 +27,14 @@ struct Bounds {
 };
 
 struct Metadata {
-  int id;
+  VariableId id;
   std::vector<int> constraints;
 };
 
 struct Constraint {
   int lmin, lmax;
   int id;
-  std::vector<int> variables;
+  std::vector<VariableId> variables;
 };
 
 class State {
@@ -46,23 +55,23 @@ class State {
     solution = bounds;
   }
 
-  int read_lmax(int id) const {
+  int read_lmax(VariableId id) const {
     return bounds[id].lmax;
   }
 
-  int read_lmin(int id) const {
+  int read_lmin(VariableId id) const {
     return bounds[id].lmin;
   }
 
-  bool fixed(int id) const {
+  bool fixed(VariableId id) const {
     return bounds[id].lmin == bounds[id].lmax;
   }
 
-  int value(int id) const {
+  int value(VariableId id) const {
     return solution[id].lmin;
   }
 
-  void change_var(int var_id, int lmin, int lmax) {
+  void change_var(VariableId var_id, int lmin, int lmax) {
     bounds[var_id].lmin = lmin;
     bounds[var_id].lmax = lmax;
   }
@@ -96,22 +105,6 @@ class ConstraintSolver {
     delete state;
   }
 
-  int read_lmax(int id) {
-    return state->read_lmax(id);
-  }
-
-  int read_lmin(int id) {
-    return state->read_lmin(id);
-  }
-
-  bool fixed(int id) {
-    return state->fixed(id);
-  }
-
-  void change_var(int var_id, int lmin, int lmax) {
-    state->change_var(var_id, lmin, lmax);
-  }
-
   int create_variable(int lmin, int lmax) {
     Variable v;
     v.lmin = lmin;
@@ -125,7 +118,7 @@ class ConstraintSolver {
     external.push_back(cons);
   }
 
-  int value(int id) {
+  int value(VariableId id) {
     return state->value(id);
   }
 
@@ -138,7 +131,7 @@ class ConstraintSolver {
     return constraints.size() - 1;
   }
 
-  void add_variable(int constraint_id, int variable_id) {
+  void add_variable(int constraint_id, VariableId variable_id) {
     constraints[constraint_id].variables.push_back(variable_id);
     variables[variable_id].constraints.push_back(constraint_id);
   }
@@ -154,7 +147,7 @@ class ConstraintSolver {
     tight();
     int freevars = 0;
     for (const auto& var : variables) {
-      if (!fixed(var.id)) {
+      if (!state->fixed(var.id)) {
         freevars++;
       }
       //std::cout << "var " << var.id << " : lmin " << read_lmin(var.id)
@@ -179,12 +172,12 @@ class ConstraintSolver {
       state->save_solution();
       return true;
     }
-    int index = choose();
+    VariableId index = choose();
     std::vector<Bounds> bkp = state->get_variables();
-    int savemin = read_lmin(index), savemax = read_lmax(index);
+    int savemin = state->read_lmin(index), savemax = state->read_lmax(index);
     for (int i = savemin; i <= savemax; i++) {
       state->set_variables(bkp);
-      change_var(index, i, i);
+      state->change_var(index, i, i);
       for (int cons : variables[index].constraints) {
         if (!queued_constraints[cons]) {
           active_constraints.push(cons);
@@ -210,12 +203,12 @@ class ConstraintSolver {
     return true;
   }
 
-  int choose() {
-    int chosen = 0;
+  VariableId choose() {
+    VariableId chosen = 0;
     int diff = std::numeric_limits<int>::max();
     for (const Variable& var : variables) {
-      if (!fixed(var.id)) {
-        int cur_diff = read_lmax(var.id) - read_lmin(var.id);
+      if (!state->fixed(var.id)) {
+        int cur_diff = state->read_lmax(var.id) - state->read_lmin(var.id);
         if (cur_diff < diff) {
           chosen = var.id;
           diff = cur_diff;
@@ -230,7 +223,7 @@ class ConstraintSolver {
 
   bool finished() {
     for (const Variable& var : variables) {
-      if (!fixed(var.id)) {
+      if (!state->fixed(var.id)) {
         return false;
       }
     }
@@ -268,33 +261,33 @@ class ConstraintSolver {
   bool update_constraint(const Constraint& cons, bool& valid) {
     constraints_checked++;
     int allmax = 0, allmin = 0;
-    for (int ivar : cons.variables) {
-      allmax += read_lmax(ivar);
-      allmin += read_lmin(ivar);
+    for (const VariableId& ivar : cons.variables) {
+      allmax += state->read_lmax(ivar);
+      allmin += state->read_lmin(ivar);
     }
     if (allmax < cons.lmin || allmin > cons.lmax) {
       valid = false;
       return false;
     }
-    for (int ivar : cons.variables) {
+    for (const VariableId& ivar : cons.variables) {
       // increase min
-      int limit = cons.lmin - allmax + read_lmax(ivar);
-      if (limit > read_lmax(ivar)) {
+      int limit = cons.lmin - allmax + state->read_lmax(ivar);
+      if (limit > state->read_lmax(ivar)) {
         valid = false;
         return false;
       }
-      if (read_lmin(ivar) < limit) {
-        change_var(ivar, limit, read_lmax(ivar));
+      if (state->read_lmin(ivar) < limit) {
+        state->change_var(ivar, limit, state->read_lmax(ivar));
         return true;
       }
       // decrease max
-      limit = cons.lmax - allmin + read_lmin(ivar);
-      if (limit < read_lmin(ivar)) {
+      limit = cons.lmax - allmin + state->read_lmin(ivar);
+      if (limit < state->read_lmin(ivar)) {
         valid = false;
         return false;
       }
-      if (read_lmax(ivar) > limit) {
-        change_var(ivar, read_lmin(ivar), limit);
+      if (state->read_lmax(ivar) > limit) {
+        state->change_var(ivar, state->read_lmin(ivar), limit);
         return true;
       }
     }
