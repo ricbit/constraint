@@ -90,19 +90,64 @@ class ExternalConstraint {
   virtual bool operator()(const State* state) const = 0;
 };
 
-class ConstraintSolver {
-  int recursion_nodes, constraints_checked;
-  State* state;
-  std::vector<Variable> variables;
-  std::vector<Constraint> constraints;
-  std::vector<const ExternalConstraint*> external;
+class ConstraintQueue {
+  const std::vector<Variable>& variables;
+  const std::vector<Constraint>& constraints;
   std::queue<int> active_constraints;
   std::vector<bool> queued_constraints;
  public:
+  ConstraintQueue(const std::vector<Variable>& variables_,
+      const std::vector<Constraint>& constraints_)
+      : variables(variables_), constraints(constraints_) {
+    queued_constraints.resize(constraints.size(), true);
+    for (const Constraint& cons : constraints) {
+      active_constraints.push(cons.id);
+    }
+  }
+
+  void push_variable(VariableId index) {
+    for (int cons : variables[index].constraints) {
+      if (!queued_constraints[cons]) {
+        active_constraints.push(cons);
+        queued_constraints[cons] = true;
+      }
+    }
+  }
+
+  int pop_constraint() {
+    int cons = active_constraints.front();
+    active_constraints.pop();
+    queued_constraints[cons] = false;
+    return cons;
+  }
+
+  bool empty() {
+    return active_constraints.empty();
+  }
+
+  void clear() {
+    while (!active_constraints.empty()) {
+      int id = active_constraints.front();
+      active_constraints.pop();
+      queued_constraints[id] = false;
+    }
+  }
+};
+
+class ConstraintSolver {
+  int recursion_nodes, constraints_checked;
+  State* state;
+  ConstraintQueue* cqueue;
+  std::vector<Variable> variables;
+  std::vector<Constraint> constraints;
+  std::vector<const ExternalConstraint*> external;
+ public:
   ConstraintSolver() 
-      : recursion_nodes(0), constraints_checked(0), state(nullptr) {}
+      : recursion_nodes(0), constraints_checked(0), 
+        state(nullptr), cqueue(nullptr) {}
   ~ConstraintSolver() { 
     delete state;
+    delete cqueue;
   }
 
   int create_variable(int lmin, int lmax) {
@@ -140,10 +185,7 @@ class ConstraintSolver {
     state = new State(variables);
     std::cout << "Variables: " << variables.size() << "\n";
     std::cout << "Constraints: " << constraints.size() << "\n";
-    queued_constraints.resize(constraints.size(), true);
-    for (const Constraint& cons : constraints) {
-      active_constraints.push(cons.id);
-    }
+    cqueue = new ConstraintQueue(variables, constraints);
     tight();
     int freevars = 0;
     for (const auto& var : variables) {
@@ -178,12 +220,7 @@ class ConstraintSolver {
     for (int i = savemin; i <= savemax; i++) {
       state->set_variables(bkp);
       state->change_var(index, i, i);
-      for (int cons : variables[index].constraints) {
-        if (!queued_constraints[cons]) {
-          active_constraints.push(cons);
-          queued_constraints[cons] = true;
-        }
-      }
+      cqueue->push_variable(index);
       if (tight() && valid()) {
         if (recursion()) {
           return true;
@@ -231,34 +268,17 @@ class ConstraintSolver {
   }
 
   bool tight() {
-    bool valid = true;
-    while (!active_constraints.empty()) {
-      int id = active_constraints.front();
-      active_constraints.pop();
-      queued_constraints[id] = false;
-      if (update_constraint(constraints[id], valid)) {
-        for (int var : constraints[id].variables) {
-          for (int cons : variables[var].constraints) {
-            if (!queued_constraints[cons]) {
-              active_constraints.push(cons);
-              queued_constraints[cons] = true;
-            }
-          }
-        }
-      }
-      if (!valid) {
-        while (!active_constraints.empty()) {
-          int id = active_constraints.front();
-          active_constraints.pop();
-          queued_constraints[id] = false;
-        }
+    while (!cqueue->empty()) {
+      int id = cqueue->pop_constraint();
+      if (!update_constraint(constraints[id], cqueue)) {
+        cqueue->clear();
         return false;
       }
     }
     return true;
   }
 
-  bool update_constraint(const Constraint& cons, bool& valid) {
+  bool update_constraint(const Constraint& cons, ConstraintQueue* cqueue) {
     constraints_checked++;
     int allmax = 0, allmin = 0;
     for (const VariableId& ivar : cons.variables) {
@@ -266,32 +286,31 @@ class ConstraintSolver {
       allmin += state->read_lmin(ivar);
     }
     if (allmax < cons.lmin || allmin > cons.lmax) {
-      valid = false;
       return false;
     }
     for (const VariableId& ivar : cons.variables) {
       // increase min
       int limit = cons.lmin - allmax + state->read_lmax(ivar);
       if (limit > state->read_lmax(ivar)) {
-        valid = false;
         return false;
       }
       if (state->read_lmin(ivar) < limit) {
         state->change_var(ivar, limit, state->read_lmax(ivar));
+        cqueue->push_variable(ivar);
         return true;
       }
       // decrease max
       limit = cons.lmax - allmin + state->read_lmin(ivar);
       if (limit < state->read_lmin(ivar)) {
-        valid = false;
         return false;
       }
       if (state->read_lmax(ivar) > limit) {
         state->change_var(ivar, state->read_lmin(ivar), limit);
+        cqueue->push_variable(ivar);
         return true;
       }
     }
-    return false;
+    return true;
   }
 };
 
