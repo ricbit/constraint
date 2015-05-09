@@ -181,7 +181,7 @@ class ConstraintSolver {
     variables[variable_id].constraints.push_back(constraint_id);
   }
 
-  void solve() {
+  bool solve() {
     state = new State(variables);
     std::cout << "Variables: " << variables.size() << "\n";
     std::cout << "Constraints: " << constraints.size() << "\n";
@@ -203,9 +203,11 @@ class ConstraintSolver {
       std::cout << "\n";
     }*/
     std::cout << "Free variables: " << freevars << "\n";
-    recursion();
+    bool result = recursion();
     std::cout << "Recursion nodes: " << recursion_nodes << "\n";
     std::cout << "Constraints checked: " << constraints_checked << "\n";
+    std::cout << "Solution " << (result ? "" : "not ") << "found\n";
+    return result;
   }
 
   bool recursion() {

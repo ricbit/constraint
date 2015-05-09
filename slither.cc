@@ -47,6 +47,9 @@ class SingleLineConstraint : public ExternalConstraint {
         break;
       }
     }
+    if (start < 0) {
+      return true;
+    }
     vector<bool> visited(links.size(), false);
     visited[start] = true;
     queue<int> next;
@@ -169,7 +172,7 @@ class SlitherLinkSolver {
     }*/
   }
 
-  void solve() {
+  bool solve() {
     for (Link& link: links) {
       link.id = solver.create_variable(0, 1);
     }
@@ -193,10 +196,11 @@ class SlitherLinkSolver {
     }
     SingleLineConstraint single_line(nodes, links);
     solver.add_external_constraint(&single_line);
-    solver.solve();
+    bool result = solver.solve();
     for (auto cons : external) {
       delete cons;
     }
+    return result;
   }
 
   void print() {
@@ -238,7 +242,8 @@ int main() {
   }
   SlitherLinkSolver s(width, height, grid);  
   s.degeometrize();
-  s.solve();
-  s.print();
+  if (s.solve()) {
+    s.print();
+  }
   return 0;
 }
