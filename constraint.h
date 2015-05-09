@@ -192,16 +192,7 @@ class ConstraintSolver {
       if (!state->fixed(var.id)) {
         freevars++;
       }
-      //std::cout << "var " << var.id << " : lmin " << read_lmin(var.id)
-      //          << " lmax " << read_lmax(var.id) << "\n";
     }
-    /*for (const Constraint& cons : constraints) {
-      std::cout << "cons " << cons.id << " : ";
-      for (int var : cons.variables) {
-        std::cout << var << " ";
-      }
-      std::cout << "\n";
-    }*/
     std::cout << "Free variables: " << freevars << "\n";
     bool result = recursion();
     std::cout << "Recursion nodes: " << recursion_nodes << "\n";
