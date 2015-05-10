@@ -90,18 +90,27 @@ class ExternalConstraint {
   virtual bool operator()(const State* state) const = 0;
 };
 
+class ConstraintQueue;
+
+class TightenConstraint {
+ public:
+  virtual bool update_constraint(
+      State *state, ConstraintQueue* cqueue) const = 0;
+  virtual const std::vector<VariableId>& get_variables() const = 0;
+};
+
 class ConstraintQueue {
   const std::vector<Variable>& variables;
-  const std::vector<Constraint>& constraints;
+  const std::vector<const TightenConstraint*>& constraints;
   std::queue<int> active_constraints;
   std::vector<bool> queued_constraints;
  public:
   ConstraintQueue(const std::vector<Variable>& variables_,
-      const std::vector<Constraint>& constraints_)
+      const std::vector<const TightenConstraint*>& constraints_)
       : variables(variables_), constraints(constraints_) {
     queued_constraints.resize(constraints.size(), true);
-    for (const Constraint& cons : constraints) {
-      active_constraints.push(cons.id);
+    for (int i = 0; i < int(constraints.size()); i++) {
+      active_constraints.push(i);
     }
   }
 
@@ -134,6 +143,56 @@ class ConstraintQueue {
   }
 };
 
+class LinearConstraint : public TightenConstraint {
+  int lmin, lmax;
+  std::vector<VariableId> variables;
+ public:
+  LinearConstraint(int lmin_, int lmax_) : lmin(lmin_), lmax(lmax_) {}
+  virtual ~LinearConstraint() {}
+
+  void add_variable(VariableId id) {
+    variables.push_back(id);
+  }
+
+  virtual const std::vector<VariableId>& get_variables() const {
+    return variables;
+  }
+
+  virtual bool update_constraint(State *state, ConstraintQueue* cqueue) const {
+    int allmax = 0, allmin = 0;
+    for (const VariableId& ivar : variables) {
+      allmax += state->read_lmax(ivar);
+      allmin += state->read_lmin(ivar);
+    }
+    if (allmax < lmin || allmin > lmax) {
+      return false;
+    }
+    for (const VariableId& ivar : variables) {
+      // increase min
+      int limit = lmin - allmax + state->read_lmax(ivar);
+      if (limit > state->read_lmax(ivar)) {
+        return false;
+      }
+      if (state->read_lmin(ivar) < limit) {
+        state->change_var(ivar, limit, state->read_lmax(ivar));
+        cqueue->push_variable(ivar);
+        return true;
+      }
+      // decrease max
+      limit = lmax - allmin + state->read_lmin(ivar);
+      if (limit < state->read_lmin(ivar)) {
+        return false;
+      }
+      if (state->read_lmax(ivar) > limit) {
+        state->change_var(ivar, state->read_lmin(ivar), limit);
+        cqueue->push_variable(ivar);
+        return true;
+      }
+    }
+    return true;
+  }
+};
+
 class ConstraintSolver {
   int recursion_nodes, constraints_checked;
   State* state;
@@ -141,6 +200,7 @@ class ConstraintSolver {
   std::vector<Variable> variables;
   std::vector<Constraint> constraints;
   std::vector<const ExternalConstraint*> external;
+  std::vector<const TightenConstraint*> tighten;
  public:
   ConstraintSolver() 
       : recursion_nodes(0), constraints_checked(0), 
@@ -167,25 +227,19 @@ class ConstraintSolver {
     return state->value(id);
   }
 
-  int create_constraint(int lmin, int lmax) {
-    Constraint cons;
-    cons.lmin = lmin;
-    cons.lmax = lmax;
-    cons.id = constraints.size();
-    constraints.push_back(cons);
-    return constraints.size() - 1;
-  }
-
-  void add_variable(int constraint_id, VariableId variable_id) {
-    constraints[constraint_id].variables.push_back(variable_id);
-    variables[variable_id].constraints.push_back(constraint_id);
+  void add_constraint(const TightenConstraint* cons) {
+    int id = tighten.size();
+    tighten.push_back(cons);
+    for (const VariableId& var : cons->get_variables()) {
+      variables[var].constraints.push_back(id);
+    }
   }
 
   bool solve() {
     state = new State(variables);
     std::cout << "Variables: " << variables.size() << "\n";
     std::cout << "Constraints: " << constraints.size() << "\n";
-    cqueue = new ConstraintQueue(variables, constraints);
+    cqueue = new ConstraintQueue(variables, tighten);
     tight();
     int freevars = 0;
     for (const auto& var : variables) {
@@ -263,44 +317,10 @@ class ConstraintSolver {
   bool tight() {
     while (!cqueue->empty()) {
       int id = cqueue->pop_constraint();
-      if (!update_constraint(constraints[id], cqueue)) {
+      constraints_checked++;
+      if (!tighten[id]->update_constraint(state, cqueue)) {
         cqueue->clear();
         return false;
-      }
-    }
-    return true;
-  }
-
-  bool update_constraint(const Constraint& cons, ConstraintQueue* cqueue) {
-    constraints_checked++;
-    int allmax = 0, allmin = 0;
-    for (const VariableId& ivar : cons.variables) {
-      allmax += state->read_lmax(ivar);
-      allmin += state->read_lmin(ivar);
-    }
-    if (allmax < cons.lmin || allmin > cons.lmax) {
-      return false;
-    }
-    for (const VariableId& ivar : cons.variables) {
-      // increase min
-      int limit = cons.lmin - allmax + state->read_lmax(ivar);
-      if (limit > state->read_lmax(ivar)) {
-        return false;
-      }
-      if (state->read_lmin(ivar) < limit) {
-        state->change_var(ivar, limit, state->read_lmax(ivar));
-        cqueue->push_variable(ivar);
-        return true;
-      }
-      // decrease max
-      limit = cons.lmax - allmin + state->read_lmin(ivar);
-      if (limit < state->read_lmin(ivar)) {
-        return false;
-      }
-      if (state->read_lmax(ivar) > limit) {
-        state->change_var(ivar, state->read_lmin(ivar), limit);
-        cqueue->push_variable(ivar);
-        return true;
       }
     }
     return true;

@@ -158,30 +158,28 @@ class SlitherLinkSolver {
         }
       }
     }
-    /*for (const Cell& cell : cells) {
-      cout << "cell ";
-      for (int link : cell.links) {
-        cout << link << " ";
-      }
-      cout << "\n";
-    }*/
   }
 
   bool solve() {
     for (Link& link: links) {
       link.id = solver.create_variable(0, 1);
     }
+    vector<LinearConstraint*> linear;
     for (const Cell& cell : cells) {
-      auto cons = solver.create_constraint(cell.size, cell.size);
+      auto cons = new LinearConstraint(cell.size, cell.size);
       for (int link : cell.links) {
-        solver.add_variable(cons, link);
+        cons->add_variable(link);
       }
+      linear.push_back(cons);
+      solver.add_constraint(cons);
     }
     for (const Node& node : nodes) {
-      auto cons = solver.create_constraint(0, 2);
+      auto cons = new LinearConstraint(0, 2);
       for (int link : node.links) {
-        solver.add_variable(cons, link);
+        cons->add_variable(link);
       }
+      linear.push_back(cons);
+      solver.add_constraint(cons);
     }
     vector<PointConstraint*> external;
     for (const Node& node : nodes) {

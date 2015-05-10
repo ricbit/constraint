@@ -152,19 +152,23 @@ class HashiSolver {
     for (auto& link : links) {
       link.id = solver.create_variable(0, 2);
     }
+    vector<LinearConstraint*> linear;
     for (const auto& n : nodes) {
-      auto cons = solver.create_constraint(n.size, n.size);
+      auto cons = new LinearConstraint(n.size, n.size);
       for (auto link : n.links) {
-        solver.add_variable(cons, links[link].id);
+        cons->add_variable(links[link].id);
       }
+      linear.push_back(cons);
+      solver.add_constraint(cons);
     }
     if (nodes.size() > 2) {
       for (const auto& link : links) {
         if (nodes[link.a].size == nodes[link.b].size &&
             nodes[link.a].size <= 2) {
           int size = nodes[link.a].size;
-          auto cons = solver.create_constraint(0, size - 1);
-          solver.add_variable(cons, link.id);
+          auto cons = new LinearConstraint(0, size - 1);
+          cons->add_variable(link.id);
+          solver.add_constraint(cons);
         }
       }
     }
