@@ -31,12 +31,6 @@ struct Metadata {
   std::vector<int> constraints;
 };
 
-struct Constraint {
-  int lmin, lmax;
-  int id;
-  std::vector<VariableId> variables;
-};
-
 class State {
   std::vector<Bounds> bounds, solution;
   std::vector<Metadata> metadata;
@@ -198,7 +192,6 @@ class ConstraintSolver {
   State* state;
   ConstraintQueue* cqueue;
   std::vector<Variable> variables;
-  std::vector<Constraint> constraints;
   std::vector<const ExternalConstraint*> external;
   std::vector<const TightenConstraint*> tighten;
  public:
@@ -238,7 +231,7 @@ class ConstraintSolver {
   bool solve() {
     state = new State(variables);
     std::cout << "Variables: " << variables.size() << "\n";
-    std::cout << "Constraints: " << constraints.size() << "\n";
+    std::cout << "Constraints: " << tighten.size() << "\n";
     cqueue = new ConstraintQueue(variables, tighten);
     tight();
     int freevars = 0;
