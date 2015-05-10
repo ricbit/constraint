@@ -10,7 +10,7 @@ using namespace std;
 struct Node {
   int y, x;
   int id;
-  vector<int> links;
+  vector<VariableId> links;
   Node(int y_, int x_, int id_) : y(y_), x(x_), id(id_) {}
 };
 
@@ -76,19 +76,39 @@ class SingleLineConstraint : public ExternalConstraint {
   }
 };
 
-class PointConstraint : public ExternalConstraint {
-  const vector<int>& links;
+class PointConstraint : public TightenConstraint {
+  const vector<VariableId>& links;
  public:
-  PointConstraint(const vector<int>& links_) : links(links_) {}
+  PointConstraint(const vector<VariableId>& links_) : links(links_) {}
   virtual ~PointConstraint() {}
 
-  virtual bool operator()(const State* state) const {
+  virtual const std::vector<VariableId>& get_variables() const {
+    return links;
+  }
+
+  virtual bool update_constraint(State* state, ConstraintQueue* cqueue) const {
     int fixed = 0;
     int fixedsum = 0;
     for (int link : links) {
       if (state->fixed(link)) {
         fixed++;
         fixedsum += state->read_lmin(link);
+      }
+    }
+    if (fixed == int(links.size()) - 1) {
+      if (fixedsum > 2) {
+        return false;
+      }
+      int value = 0;
+      if (fixedsum == 1) {
+        value = 1;
+      }
+      for (int link : links) {
+        if (!state->fixed(link)) {
+          state->change_var(link, value, value);
+          cqueue->push_variable(link);
+          return true;
+        }
       }
     }
     if (fixed < int(links.size())) {
@@ -164,7 +184,7 @@ class SlitherLinkSolver {
     for (Link& link: links) {
       link.id = solver.create_variable(0, 1);
     }
-    vector<LinearConstraint*> linear;
+    vector<TightenConstraint*> linear;
     for (const Cell& cell : cells) {
       auto cons = new LinearConstraint(cell.size, cell.size);
       for (int link : cell.links) {
@@ -184,8 +204,8 @@ class SlitherLinkSolver {
     vector<PointConstraint*> external;
     for (const Node& node : nodes) {
       PointConstraint *pc = new PointConstraint(node.links);
-      external.push_back(pc);
-      solver.add_external_constraint(pc);
+      linear.push_back(pc);
+      solver.add_constraint(pc);
     }
     SingleLineConstraint single_line(nodes, links);
     solver.add_external_constraint(&single_line);
